@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Customer Simulator</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">&#x1F6D2;</span>
+      <span class="logo-text">AI Customer <span>Simulator</span></span>
+    </div>
+
+    <div class="input-row">
+      <input
+        id="url-input"
+        type="url"
+        placeholder="https://yourstore.com"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button id="run-btn" onclick="handleRun()">&#x25B6; Run Simulation</button>
+    </div>
+
+    <div class="header-options-row">
+      <div class="ab-row">
+        <label class="ab-label">
+          A/B Price:
+          <strong id="modifier-display">1.00&times;</strong>
+        </label>
+        <input
+          id="price-slider"
+          type="range"
+          min="0.5"
+          max="1.5"
+          step="0.05"
+          value="1.0"
+          oninput="updateModifierLabel()"
+        />
+        <button id="ab-btn" onclick="handleAB()">Run A/B Test</button>
+      </div>
+
+      <div class="header-toggles">
+        <label class="toggle-label">
+          <input type="checkbox" id="vision-toggle" />
+          <span>&#x1F4F7; Visual Analysis</span>
+        </label>
+        <button id="persona-btn" class="btn-ghost" onclick="togglePersonaPanel()">
+          &#x1F464; Custom Personas
+          <span id="persona-count-badge" class="persona-count-badge hidden">0</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ========== TAB BAR ========== -->
+<nav class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" onclick="switchTab('simulator')">&#x1F4CA; Simulator</button>
+    <button class="tab-btn" onclick="switchTab('impact')">&#x1F680; Impact</button>
+  </div>
+</nav>
+
+<!-- ========== CUSTOM PERSONA BUILDER ========== -->
+<div id="persona-panel" class="persona-panel hidden">
+  <div class="persona-panel-inner">
+    <div class="persona-panel-header">
+      <h3 class="persona-panel-title">Custom Persona Builder</h3>
+      <button onclick="togglePersonaPanel()" class="btn-ghost-sm">&#x2715; Close</button>
+    </div>
+    <p class="persona-panel-desc">
+      Define custom agents to run instead of the default 9 personas. Leave empty to use defaults.
+    </p>
+
+    <div class="persona-form">
+      <div class="persona-form-row">
+        <div class="form-field">
+          <label class="form-label">Agent ID</label>
+          <input id="p-id" class="form-input" placeholder="e.g. bargain_hunter" />
+        </div>
+        <div class="form-field">
+          <label class="form-label">Type</label>
+          <select id="p-type" class="form-input">
+            <option value="budget">Budget</option>
+            <option value="luxury">Luxury</option>
+            <option value="impulsive">Impulsive</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-field form-field-sm">
+          <label class="form-label">Budget ($)</label>
+          <input id="p-budget" type="number" class="form-input" placeholder="150" min="1" max="10000" />
+        </div>
+        <div class="form-field form-field-sm">
+          <label class="form-label">Impulsiveness (<span id="p-imp-display">0.50</span>)</label>
+          <input id="p-impulsiveness" type="range" min="0" max="1" step="0.05" value="0.5"
+            class="form-input"
+            oninput="document.getElementById('p-imp-display').textContent = parseFloat(this.value).toFixed(2)" />
+        </div>
+      </div>
+      <div class="persona-form-row">
+        <div class="form-field" style="flex:1">
+          <label class="form-label">Goal</label>
+          <input id="p-goal" class="form-input" placeholder="e.g. Find a gift under $50 for a friend who likes running" />
+        </div>
+        <button onclick="addPersona()" class="btn-add-persona">+ Add Persona</button>
+      </div>
+    </div>
+
+    <div id="persona-list" class="persona-list"></div>
+
+    <div class="persona-actions">
+      <button onclick="clearPersonas()" class="btn-ghost-sm">Clear all</button>
+      <span id="persona-using-default" class="persona-hint">Using default 9 personas</span>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     SIMULATOR TAB
+     ===================================================== -->
+<div id="tab-simulator">
+
+  <!-- Live Agent Feed (streaming) -->
+  <div id="live-feed" class="hidden">
+    <div class="live-feed-header">
+      <div class="live-dot"></div>
+      <span id="live-status-text">Connecting...</span>
+    </div>
+    <div id="live-agents" class="live-agents"></div>
+  </div>
+
+  <!-- Loading (A/B fallback) -->
+  <div id="loading" class="hidden">
+    <div class="spinner"></div>
+    <div id="loading-text" class="loading-text">Scraping site...</div>
+    <div class="agent-dots">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-banner" class="hidden error-banner"></div>
+
+  <!-- Main Dashboard -->
+  <main id="dashboard" class="hidden">
+
+    <div id="site-strip" class="site-strip">
+      <span id="site-headline"></span>
+      <span id="site-cta" class="cta-badge"></span>
+    </div>
+
+    <section class="section">
+      <h2 class="section-title">Overview</h2>
+      <div class="kpi-grid">
+        <div class="kpi-card" id="kpi-conversion">
+          <div class="kpi-label">Conversion Rate</div>
+          <div class="kpi-value" id="val-conversion">-</div>
+        </div>
+        <div class="kpi-card" id="kpi-dropoff">
+          <div class="kpi-label">Drop-off Rate</div>
+          <div class="kpi-value" id="val-dropoff">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg Steps</div>
+          <div class="kpi-value" id="val-steps">-</div>
+        </div>
+        <div class="kpi-card" id="kpi-ux">
+          <div class="kpi-label">UX Score</div>
+          <div class="kpi-value" id="val-ux">-</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Analytics</h2>
+      <div class="charts-row">
+        <div class="chart-card pie-card">
+          <div class="chart-title">Purchased vs Left</div>
+          <canvas id="pie-chart"></canvas>
+        </div>
+        <div class="chart-card bar-card">
+          <div class="chart-title">Conversion by Persona</div>
+          <canvas id="bar-chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">UX Breakdown</h2>
+      <div id="ux-pills" class="pill-row"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Agent Journeys</h2>
+      <div id="timeline" class="timeline"></div>
+    </section>
+
+    <section class="section" id="report-section">
+      <h2 class="section-title">UX Consultant Report <span class="report-badge">GPT-4o</span></h2>
+      <div id="ux-report" class="report-card">
+        <div class="report-score-row">
+          <div class="report-score-wrap">
+            <div class="report-score-label">Overall Score</div>
+            <div class="report-score" id="report-score">—</div>
+            <div class="report-score-sub" id="report-score-rationale"></div>
+          </div>
+          <div class="report-summary" id="report-summary"></div>
+        </div>
+        <div class="report-cols">
+          <div class="report-col">
+            <div class="report-col-title report-col-title--red">Critical Issues</div>
+            <ul id="report-issues" class="report-list report-list--red"></ul>
+          </div>
+          <div class="report-col">
+            <div class="report-col-title report-col-title--green">Quick Wins</div>
+            <ul id="report-wins" class="report-list report-list--green"></ul>
+          </div>
+        </div>
+        <div class="report-section-label">Persona Insights</div>
+        <div id="report-personas" class="report-personas"></div>
+        <div class="report-section-label">Tool Usage Insights</div>
+        <div id="report-tools" class="report-tools-text"></div>
+        <div class="report-section-label">Redesign Priorities</div>
+        <ol id="report-priorities" class="report-priorities"></ol>
+      </div>
+    </section>
+
+    <section class="section hidden" id="visual-section">
+      <h2 class="section-title">Visual Analysis <span class="report-badge">GPT-4o Vision</span></h2>
+      <div id="visual-card" class="visual-card">
+        <div class="visual-score-row">
+          <div class="visual-score-wrap">
+            <div class="report-score-label">Visual Score</div>
+            <div class="report-score" id="visual-score">—</div>
+          </div>
+          <div class="visual-verdict" id="visual-verdict"></div>
+        </div>
+        <div class="visual-grid">
+          <div class="visual-metric">
+            <div class="visual-metric-label">First Impression</div>
+            <div class="visual-metric-value" id="visual-impression"></div>
+          </div>
+          <div class="visual-metric">
+            <div class="visual-metric-label">Layout Clarity</div>
+            <div class="visual-metric-value" id="visual-layout"></div>
+          </div>
+          <div class="visual-metric">
+            <div class="visual-metric-label">CTA Visibility</div>
+            <div class="visual-metric-value" id="visual-cta"></div>
+          </div>
+          <div class="visual-metric">
+            <div class="visual-metric-label">Trust Signals</div>
+            <div class="visual-metric-value" id="visual-trust"></div>
+          </div>
+          <div class="visual-metric">
+            <div class="visual-metric-label">Mobile Readiness</div>
+            <div class="visual-metric-value" id="visual-mobile"></div>
+          </div>
+        </div>
+        <div class="visual-friction-section">
+          <div class="visual-metric-label">Friction Points</div>
+          <div id="visual-friction" class="pill-row" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Top Complaint Keywords</h2>
+      <div id="complaints" class="pill-row"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Drop-off Themes</h2>
+      <div id="theme-bars" class="theme-bars"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Why Each Agent Left</h2>
+      <div id="dropoff-insights" class="insight-grid"></div>
+    </section>
+
+    <section class="section" id="purchase-section">
+      <h2 class="section-title">Why Each Agent Purchased</h2>
+      <div id="purchase-insights" class="insight-grid"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Products Detected</h2>
+      <div id="products-grid" class="products-grid"></div>
+    </section>
+
+  </main>
+
+  <!-- A/B Comparison -->
+  <div id="ab-section" class="hidden">
+    <div class="ab-header">
+      <h2>A/B Test Comparison</h2>
+      <span id="ab-subtitle"></span>
+    </div>
+    <div class="ab-grid">
+      <div class="ab-col">
+        <div class="ab-col-label">Original (1.00&times;)</div>
+        <div id="ab-original" class="ab-kpis"></div>
+      </div>
+      <div class="ab-col">
+        <div class="ab-col-label" id="ab-modified-label">Modified</div>
+        <div id="ab-modified" class="ab-kpis"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-simulator -->
+
+
+<!-- =====================================================
+     IMPACT TAB
+     ===================================================== -->
+<div id="tab-impact" class="hidden">
+
+  <!-- Hero -->
+  <div class="impact-hero">
+    <div class="impact-hero-inner">
+      <span class="impact-hero-eyebrow">&#x1F4CA; Market Research &amp; AI</span>
+      <h1 class="impact-hero-title">
+        Stop guessing.<br/><em>Start simulating.</em>
+      </h1>
+      <p class="impact-hero-sub">
+        The customer research industry spends billions every year on slow, expensive, small-sample
+        studies. AI changes everything — turning weeks of research into minutes.
+      </p>
+      <div class="impact-hero-stats">
+        <div class="impact-hero-stat">
+          <div class="impact-hero-stat-num">$12B</div>
+          <div class="impact-hero-stat-label">CX Research Market</div>
+        </div>
+        <div class="impact-hero-stat">
+          <div class="impact-hero-stat-num">70%</div>
+          <div class="impact-hero-stat-label">Avg Cart Abandonment</div>
+        </div>
+        <div class="impact-hero-stat">
+          <div class="impact-hero-stat-num">6 wks</div>
+          <div class="impact-hero-stat-label">Avg Research Study</div>
+        </div>
+        <div class="impact-hero-stat">
+          <div class="impact-hero-stat-num">10 min</div>
+          <div class="impact-hero-stat-label">With AI Simulation</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Animated Counter Row -->
+  <div class="impact-counters">
+    <div class="impact-counters-inner">
+      <div class="impact-counter">
+        <span class="impact-counter-icon">&#x1F4B0;</span>
+        <div>
+          <span class="impact-counter-num" data-target="100" data-suffix="x">0</span><span class="impact-counter-suffix" style="display:none"></span>
+        </div>
+        <div class="impact-counter-label">ROI on UX investment<br/><em style="font-size:10px">IBM Research, $100 per $1 spent</em></div>
+      </div>
+      <div class="impact-counter">
+        <span class="impact-counter-icon">&#x23F1;&#xFE0F;</span>
+        <div>
+          <span class="impact-counter-num" data-target="99" data-suffix="%">0</span><span class="impact-counter-suffix" style="display:none"></span>
+        </div>
+        <div class="impact-counter-label">Faster than traditional<br/><em style="font-size:10px">10 min vs 6 weeks</em></div>
+      </div>
+      <div class="impact-counter">
+        <span class="impact-counter-icon">&#x1F4C8;</span>
+        <div>
+          <span class="impact-counter-num" data-target="33" data-suffix="B">$</span><span class="impact-counter-suffix" style="display:none"></span>
+        </div>
+        <div class="impact-counter-label">CX market by 2030<br/><em style="font-size:10px">11.9% CAGR growth</em></div>
+      </div>
+      <div class="impact-counter">
+        <span class="impact-counter-icon">&#x1F4A5;</span>
+        <div>
+          <span class="impact-counter-num" data-target="400" data-suffix="%">0</span><span class="impact-counter-suffix" style="display:none"></span>
+        </div>
+        <div class="impact-counter-label">Conversion lift from UX<br/><em style="font-size:10px">Forrester Research</em></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Problem vs Solution -->
+  <div class="impact-section">
+    <div class="impact-section-eyebrow">&#x26A0;&#xFE0F; The Problem</div>
+    <h2 class="impact-section-title">Traditional research is slow,<br/>expensive, and outdated.</h2>
+    <p class="impact-section-sub">
+      Most e-commerce teams rely on methods that were designed before the internet existed.
+      They spend $10K–$50K per study, wait 4–8 weeks for results, and get feedback from
+      a dozen people who may not even represent their real customers.
+    </p>
+
+    <div class="impact-compare-grid">
+      <div class="impact-compare-card old">
+        <div class="impact-compare-card-header">
+          <span class="impact-compare-icon">&#x1F525;</span>
+          <div>
+            <div class="impact-compare-card-title">Traditional Research</div>
+            <div class="impact-compare-card-sub">Market research firms, focus groups, user testing</div>
+          </div>
+        </div>
+        <div class="impact-compare-rows">
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F4C5; Timeline</span>
+            <span class="impact-compare-row-value">4–8 weeks</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F4B5; Cost per study</span>
+            <span class="impact-compare-row-value">$10,000–$50,000</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F465; Sample size</span>
+            <span class="impact-compare-row-value">6–20 participants</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F504; Iterations</span>
+            <span class="impact-compare-row-value">1–2 per study</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F4CA; Pricing tests</span>
+            <span class="impact-compare-row-value">Weeks of setup</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F916; AI-powered</span>
+            <span class="impact-compare-row-value">No</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-compare-card new">
+        <div class="impact-compare-card-header">
+          <span class="impact-compare-icon">&#x26A1;</span>
+          <div>
+            <div class="impact-compare-card-title">AI Customer Simulator</div>
+            <div class="impact-compare-card-sub">GPT-4o agents with real tool calling</div>
+          </div>
+        </div>
+        <div class="impact-compare-rows">
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F4C5; Timeline</span>
+            <span class="impact-compare-row-value">~10 minutes</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F4B5; Cost per run</span>
+            <span class="impact-compare-row-value">~$0.50</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F465; Sample size</span>
+            <span class="impact-compare-row-value">9+ (unlimited)</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F504; Iterations</span>
+            <span class="impact-compare-row-value">Unlimited</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F4CA; Pricing tests</span>
+            <span class="impact-compare-row-value">Instant A/B slider</span>
+          </div>
+          <div class="impact-compare-row">
+            <span class="impact-compare-row-label">&#x1F916; AI-powered</span>
+            <span class="impact-compare-row-value">100% GPT-4o</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Problem Deep Dive -->
+  <div class="impact-chart-section">
+    <div class="impact-section impact-section--no-pt">
+      <div class="impact-section-eyebrow">&#x1F914; The Root Cause</div>
+      <h2 class="impact-section-title">Why do 70% of shoppers abandon without buying?</h2>
+      <p class="impact-section-sub">
+        E-commerce teams know their conversion rates. What they don't know is <em>why</em> — and without
+        understanding why, every redesign is a guess. The five biggest friction points are well-documented,
+        but identifying which ones apply to <em>your</em> store requires simulating real customer behavior.
+      </p>
+
+      <div class="impact-pain-grid">
+        <div class="impact-pain-card">
+          <div class="impact-pain-rank">01</div>
+          <div class="impact-pain-icon">&#x1F4B8;</div>
+          <div class="impact-pain-title">Unexpected Costs</div>
+          <div class="impact-pain-stat">48% of abandoners</div>
+          <div class="impact-pain-desc">Shipping fees, taxes, or fees revealed too late in checkout. Agents detect this by simulating the full funnel — not just the landing page.</div>
+        </div>
+        <div class="impact-pain-card">
+          <div class="impact-pain-rank">02</div>
+          <div class="impact-pain-icon">&#x1F6D2;</div>
+          <div class="impact-pain-title">Forced Account Creation</div>
+          <div class="impact-pain-stat">24% of abandoners</div>
+          <div class="impact-pain-desc">Shoppers leave when forced to sign up before buying. Agents surface this friction in their journey reasoning before it costs you a real sale.</div>
+        </div>
+        <div class="impact-pain-card">
+          <div class="impact-pain-rank">03</div>
+          <div class="impact-pain-icon">&#x1F4B3;</div>
+          <div class="impact-pain-title">Complex Checkout</div>
+          <div class="impact-pain-stat">22% of abandoners</div>
+          <div class="impact-pain-desc">Too many steps, confusing forms, poor UX flow. The simulator's UX score and agent drop-off themes pinpoint exactly where the journey breaks.</div>
+        </div>
+        <div class="impact-pain-card">
+          <div class="impact-pain-rank">04</div>
+          <div class="impact-pain-icon">&#x1F4F0;</div>
+          <div class="impact-pain-title">Lack of Trust Signals</div>
+          <div class="impact-pain-stat">18% of abandoners</div>
+          <div class="impact-pain-desc">No reviews, no return policy, no security badges. Agents actively search reviews and check return policies — flagging their absence as a drop-off reason.</div>
+        </div>
+        <div class="impact-pain-card">
+          <div class="impact-pain-rank">05</div>
+          <div class="impact-pain-icon">&#x1F4B0;</div>
+          <div class="impact-pain-title">Price Perception</div>
+          <div class="impact-pain-stat">17% of abandoners</div>
+          <div class="impact-pain-desc">Products feel too expensive relative to perceived value. The A/B price slider lets you instantly test price sensitivity across all 3 customer personas.</div>
+        </div>
+        <div class="impact-pain-card impact-pain-card--highlight">
+          <div class="impact-pain-rank" style="color:#16a34a">&#x1F916;</div>
+          <div class="impact-pain-icon">&#x26A1;</div>
+          <div class="impact-pain-title">AI Simulation Covers All 5</div>
+          <div class="impact-pain-stat" style="color:#16a34a">In a single 10-min run</div>
+          <div class="impact-pain-desc">Every agent's journey captures cost surprises, checkout friction, trust checks, review searches, and price reactions — across 3 distinct buyer types simultaneously.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- Market Growth Charts -->
+  <div class="impact-chart-section">
+    <div class="impact-chart-section-inner">
+      <div class="impact-section-eyebrow">&#x1F4C8; Market Data</div>
+      <h2 class="impact-section-title">A $33B opportunity by 2030</h2>
+      <p class="impact-section-sub" style="margin-bottom:32px">
+        The Customer Experience Management market is one of the fastest-growing sectors in tech.
+        AI-powered tooling is the biggest driver of that growth.
+      </p>
+
+      <div class="impact-charts-row">
+        <div class="impact-chart-card">
+          <div class="impact-chart-title">CX Management Market Size (Billions USD)</div>
+          <div class="impact-chart-sub">Historical + Projected 2020–2030 &nbsp; · &nbsp; Source: Grand View Research</div>
+          <canvas id="impact-market-chart" height="220"></canvas>
+        </div>
+        <div class="impact-chart-card">
+          <div class="impact-chart-title">Cost Per Insight: Traditional vs AI</div>
+          <div class="impact-chart-sub">Average cost to generate one actionable customer insight</div>
+          <canvas id="impact-cost-chart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROI Metrics -->
+  <div class="impact-section">
+    <div class="impact-section-eyebrow">&#x1F4B8; Return on Investment</div>
+    <h2 class="impact-section-title">The numbers speak for themselves.</h2>
+    <p class="impact-section-sub">
+      Every dollar invested in UX and customer insight tooling pays back many times over.
+      The companies that move fast on this win.
+    </p>
+
+    <div class="impact-roi-grid">
+      <div class="impact-roi-card">
+        <span class="impact-roi-icon">&#x1F4B0;</span>
+        <div class="impact-roi-value">$100</div>
+        <div class="impact-roi-label">Return per $1 in UX</div>
+        <div class="impact-roi-desc">IBM found that every dollar invested in user experience design returns up to $100 in business value through reduced development rework alone.</div>
+      </div>
+      <div class="impact-roi-card">
+        <span class="impact-roi-icon">&#x1F4C9;</span>
+        <div class="impact-roi-value">70%</div>
+        <div class="impact-roi-label">Cart Abandonment Rate</div>
+        <div class="impact-roi-desc">Baymard Institute reports 70.19% of shoppers abandon carts. A 1% improvement in conversion is worth millions annually for mid-sized stores.</div>
+      </div>
+      <div class="impact-roi-card">
+        <span class="impact-roi-icon">&#x1F3AF;</span>
+        <div class="impact-roi-value">400%</div>
+        <div class="impact-roi-label">Max Conversion Lift</div>
+        <div class="impact-roi-desc">Forrester Research found that well-executed UX improvements can increase conversion rates by up to 400% — the difference between a failing and thriving store.</div>
+      </div>
+      <div class="impact-roi-card">
+        <span class="impact-roi-icon">&#x1F527;</span>
+        <div class="impact-roi-value">100x</div>
+        <div class="impact-roi-label">Cost to Fix Post-Launch</div>
+        <div class="impact-roi-desc">The National Institute of Standards and Technology estimates UX issues cost 100x more to fix after launch than during design. Catch them early with simulation.</div>
+      </div>
+      <div class="impact-roi-card">
+        <span class="impact-roi-icon">&#x1F4CA;</span>
+        <div class="impact-roi-value">58%</div>
+        <div class="impact-roi-label">More Profitable</div>
+        <div class="impact-roi-desc">McKinsey found companies that use customer data and analytics to drive decisions are 58% more likely to beat revenue goals than peers who don't.</div>
+      </div>
+      <div class="impact-roi-card">
+        <span class="impact-roi-icon">&#x26A1;</span>
+        <div class="impact-roi-value">99%</div>
+        <div class="impact-roi-label">Faster Research Cycle</div>
+        <div class="impact-roi-desc">Replacing a 6-week traditional research cycle with a 10-minute AI simulation compresses your insight-to-action loop from months to hours.</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- Product Architecture -->
+  <div class="impact-section">
+    <div class="impact-section-eyebrow">&#x1F9F1; Product Architecture</div>
+    <h2 class="impact-section-title">Built on real AI — not smoke and mirrors.</h2>
+    <p class="impact-section-sub">
+      Unlike tools that summarize a page or run simple keyword checks, this simulator uses genuine
+      OpenAI function-calling agents that make autonomous decisions, use real tools, and produce
+      results grounded in actual browsing behavior.
+    </p>
+
+    <!-- Pipeline diagram -->
+    <div class="arch-pipeline">
+      <div class="arch-pipeline-step">
+        <div class="arch-pipeline-icon">&#x1F310;</div>
+        <div class="arch-pipeline-label">URL Input</div>
+        <div class="arch-pipeline-sub">Any e-commerce page</div>
+      </div>
+      <div class="arch-pipeline-arrow">&#x2192;</div>
+      <div class="arch-pipeline-step">
+        <div class="arch-pipeline-icon">&#x1F578;&#xFE0F;</div>
+        <div class="arch-pipeline-label">Web Scraper</div>
+        <div class="arch-pipeline-sub">requests + BeautifulSoup<br/>JSON-LD · Open Graph<br/>__NEXT_DATA__ parsing</div>
+      </div>
+      <div class="arch-pipeline-arrow">&#x2192;</div>
+      <div class="arch-pipeline-step">
+        <div class="arch-pipeline-icon">&#x1F9E0;</div>
+        <div class="arch-pipeline-label">Structured Parser</div>
+        <div class="arch-pipeline-sub">Products · Prices<br/>UX Score (0–100)<br/>CTAs · Headlines</div>
+      </div>
+      <div class="arch-pipeline-arrow">&#x2192;</div>
+      <div class="arch-pipeline-step arch-pipeline-step--accent">
+        <div class="arch-pipeline-icon">&#x1F916;</div>
+        <div class="arch-pipeline-label">9 GPT-4o Agents</div>
+        <div class="arch-pipeline-sub">Multi-turn tool calling<br/>Up to 8 turns each<br/>Shared product cache</div>
+      </div>
+      <div class="arch-pipeline-arrow">&#x2192;</div>
+      <div class="arch-pipeline-step">
+        <div class="arch-pipeline-icon">&#x1F4CA;</div>
+        <div class="arch-pipeline-label">Analytics Engine</div>
+        <div class="arch-pipeline-sub">Conversion · Drop themes<br/>Per-persona breakdown<br/>Complaint keywords</div>
+      </div>
+      <div class="arch-pipeline-arrow">&#x2192;</div>
+      <div class="arch-pipeline-step arch-pipeline-step--green">
+        <div class="arch-pipeline-icon">&#x1F4DD;</div>
+        <div class="arch-pipeline-label">GPT-4o Report</div>
+        <div class="arch-pipeline-sub">UX consultant analysis<br/>Critical issues · Quick wins<br/>Redesign priorities</div>
+      </div>
+    </div>
+
+    <!-- Agents + Tools split -->
+    <div class="arch-split">
+
+      <!-- Agent Types -->
+      <div class="arch-split-col">
+        <div class="arch-col-title">&#x1F465; The 3 Persona Types</div>
+        <p class="arch-col-sub">Each type runs as 3 agents — giving 9 total simulations per run. Agents share a product page cache to prevent redundant fetches.</p>
+
+        <div class="arch-agent-cards">
+          <div class="arch-agent-card arch-agent-card--blue">
+            <div class="arch-agent-header">
+              <span class="arch-agent-icon">&#x1F4B0;</span>
+              <div>
+                <div class="arch-agent-name">Budget Shopper</div>
+                <div class="arch-agent-meta">3 agents · $80–$110 budget</div>
+              </div>
+            </div>
+            <div class="arch-agent-traits">
+              <div class="arch-agent-trait"><span class="arch-trait-key">Impulsiveness</span><span class="arch-trait-bar"><span class="arch-trait-fill" style="width:20%;background:#2563eb"></span></span><span class="arch-trait-val">Low (0.15–0.25)</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Primary driver</span><span class="arch-trait-val arch-trait-val--text">Price &amp; value</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Likely to use</span><span class="arch-trait-val arch-trait-val--text">compare_products, search_reviews</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Drops off when</span><span class="arch-trait-val arch-trait-val--text">Prices exceed budget or no deals visible</span></div>
+            </div>
+          </div>
+
+          <div class="arch-agent-card arch-agent-card--purple">
+            <div class="arch-agent-header">
+              <span class="arch-agent-icon">&#x1F451;</span>
+              <div>
+                <div class="arch-agent-name">Luxury Buyer</div>
+                <div class="arch-agent-meta">3 agents · $400–$600 budget</div>
+              </div>
+            </div>
+            <div class="arch-agent-traits">
+              <div class="arch-agent-trait"><span class="arch-trait-key">Impulsiveness</span><span class="arch-trait-bar"><span class="arch-trait-fill" style="width:57%;background:#7c3aed"></span></span><span class="arch-trait-val">Mid (0.50–0.65)</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Primary driver</span><span class="arch-trait-val arch-trait-val--text">Quality &amp; brand trust</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Likely to use</span><span class="arch-trait-val arch-trait-val--text">view_product, check_return_policy</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Drops off when</span><span class="arch-trait-val arch-trait-val--text">Poor trust signals or weak product details</span></div>
+            </div>
+          </div>
+
+          <div class="arch-agent-card arch-agent-card--orange">
+            <div class="arch-agent-header">
+              <span class="arch-agent-icon">&#x1F525;</span>
+              <div>
+                <div class="arch-agent-name">Impulsive Buyer</div>
+                <div class="arch-agent-meta">3 agents · $150–$200 budget</div>
+              </div>
+            </div>
+            <div class="arch-agent-traits">
+              <div class="arch-agent-trait"><span class="arch-trait-key">Impulsiveness</span><span class="arch-trait-bar"><span class="arch-trait-fill" style="width:90%;background:#ea580c"></span></span><span class="arch-trait-val">High (0.85–0.95)</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Primary driver</span><span class="arch-trait-val arch-trait-val--text">Emotion &amp; urgency</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Likely to use</span><span class="arch-trait-val arch-trait-val--text">view_product, purchase quickly</span></div>
+              <div class="arch-agent-trait"><span class="arch-trait-key">Drops off when</span><span class="arch-trait-val arch-trait-val--text">Site is confusing or CTA is buried</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tool Calls -->
+      <div class="arch-split-col">
+        <div class="arch-col-title">&#x1F6E0;&#xFE0F; The 7 Agent Tools</div>
+        <p class="arch-col-sub">Each agent autonomously chooses which tools to call and in what order, producing a unique decision path. Tools return real data — not mocked responses.</p>
+
+        <div class="arch-tools-list">
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--blue">view_product</div>
+            <div class="arch-tool-desc">Fetches the full product detail page via HTTP, parses price, description, images, and specs. Agents use this to go deeper on items that catch their interest.</div>
+          </div>
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--blue">compare_products</div>
+            <div class="arch-tool-desc">Side-by-side comparison of up to 3 products from the page data. Triggers when an agent is deciding between options before committing.</div>
+          </div>
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--amber">search_reviews</div>
+            <div class="arch-tool-desc">Runs a live DuckDuckGo search for real customer reviews of the product. Results are injected back into the agent's context for the next decision.</div>
+          </div>
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--teal">check_return_policy</div>
+            <div class="arch-tool-desc">Fetches the site's return and shipping policy page. Risk-averse agents (typically luxury or budget) call this before purchasing.</div>
+          </div>
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--green">navigate_to_page</div>
+            <div class="arch-tool-desc">Navigates to a different section of the store (sale, new arrivals, category pages). Enables multi-page shopping journeys rather than single-page snapshots.</div>
+          </div>
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--success">purchase</div>
+            <div class="arch-tool-desc">Terminal action — agent declares a purchase with product name, price paid, and reasoning. Ends the simulation loop and logs a conversion event.</div>
+          </div>
+          <div class="arch-tool">
+            <div class="arch-tool-chip arch-tool-chip--danger">leave</div>
+            <div class="arch-tool-desc">Terminal action — agent exits the site with a detailed reason. This reason is the primary signal for drop-off theme classification and the UX report.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- How It Works -->
+  <div class="impact-chart-section">
+    <div class="impact-how-inner">
+      <div class="impact-section-eyebrow" style="text-align:center">&#x2699;&#xFE0F; How It Works</div>
+      <h2 class="impact-section-title" style="text-align:center">Three steps. Ten minutes. Instant clarity.</h2>
+
+      <div class="impact-steps">
+        <div class="impact-step">
+          <div class="impact-step-num">&#x1F310;</div>
+          <div class="impact-step-title">Paste Your URL</div>
+          <div class="impact-step-desc">
+            Drop in any e-commerce URL. Our scraper extracts products, pricing,
+            headlines, CTAs, and full page structure — no code required.
+          </div>
+        </div>
+        <div class="impact-step">
+          <div class="impact-step-num">&#x1F916;</div>
+          <div class="impact-step-title">9 AI Agents Shop</div>
+          <div class="impact-step-desc">
+            GPT-4o agents with distinct personas — budget, luxury, impulsive — browse
+            your store using real tools: view products, compare, search reviews, check policies.
+          </div>
+        </div>
+        <div class="impact-step">
+          <div class="impact-step-num">&#x1F4A1;</div>
+          <div class="impact-step-title">Get Instant Insights</div>
+          <div class="impact-step-desc">
+            Conversion rates, drop-off reasons, UX scores, A/B price testing, a full
+            GPT-4o consultant report — all in under 10 minutes.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Use Cases -->
+  <div class="impact-section">
+    <div class="impact-section-eyebrow">&#x1F4CB; Use Cases</div>
+    <h2 class="impact-section-title">Built for every stage of the funnel.</h2>
+    <p class="impact-section-sub">
+      From pre-launch validation to live store optimization, every e-commerce team can use this.
+    </p>
+
+    <div class="impact-use-cases">
+      <div class="impact-use-case">
+        <span class="impact-use-case-icon">&#x1F6CD;&#xFE0F;</span>
+        <div class="impact-use-case-title">Pre-Launch Testing</div>
+        <div class="impact-use-case-desc">
+          Run 9 AI customers through your store before you go live.
+          Find critical conversion blockers when they're cheapest to fix.
+        </div>
+        <span class="impact-use-case-tag">Launch Readiness</span>
+      </div>
+      <div class="impact-use-case">
+        <span class="impact-use-case-icon">&#x1F4B2;</span>
+        <div class="impact-use-case-title">Pricing Optimization</div>
+        <div class="impact-use-case-desc">
+          Use the A/B price slider to instantly test how a 10%, 20%, or 30% price
+          change affects conversion and drop-off rates across every persona segment.
+        </div>
+        <span class="impact-use-case-tag">Revenue Lift</span>
+      </div>
+      <div class="impact-use-case">
+        <span class="impact-use-case-icon">&#x1F50D;</span>
+        <div class="impact-use-case-title">UX Audit</div>
+        <div class="impact-use-case-desc">
+          Get a GPT-4o UX consultant report with critical issues, quick wins,
+          and redesign priorities — without hiring an expensive agency.
+        </div>
+        <span class="impact-use-case-tag">Conversion CRO</span>
+      </div>
+      <div class="impact-use-case">
+        <span class="impact-use-case-icon">&#x1F3AF;</span>
+        <div class="impact-use-case-title">Persona Research</div>
+        <div class="impact-use-case-desc">
+          Build custom agent personas that match your real customer segments.
+          Understand exactly how budget shoppers behave vs. luxury buyers on your site.
+        </div>
+        <span class="impact-use-case-tag">Audience Insights</span>
+      </div>
+      <div class="impact-use-case">
+        <span class="impact-use-case-icon">&#x1F30D;</span>
+        <div class="impact-use-case-title">Market Entry Validation</div>
+        <div class="impact-use-case-desc">
+          Evaluating a competitor's site or entering a new market?
+          Simulate customer behavior on any URL before you commit budget.
+        </div>
+        <span class="impact-use-case-tag">Competitive Intel</span>
+      </div>
+      <div class="impact-use-case">
+        <span class="impact-use-case-icon">&#x1F9EA;</span>
+        <div class="impact-use-case-title">Continuous Iteration</div>
+        <div class="impact-use-case-desc">
+          Unlike focus groups, you can run a new simulation every time you ship a change.
+          Build a culture of data-driven design with zero marginal cost per run.
+        </div>
+        <span class="impact-use-case-tag">Agile Research</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- Takeaways & Conclusions -->
+  <div class="impact-section">
+    <div class="impact-section-eyebrow">&#x1F3C1; Takeaways</div>
+    <h2 class="impact-section-title">What this means for the future of e-commerce.</h2>
+    <p class="impact-section-sub">
+      AI-powered behavioral simulation isn't a novelty — it's the next step in a 30-year trend
+      toward cheaper, faster, more granular customer understanding. Here's what matters most.
+    </p>
+
+    <div class="impact-takeaways-grid">
+      <div class="impact-takeaway">
+        <div class="impact-takeaway-num">1</div>
+        <div class="impact-takeaway-body">
+          <div class="impact-takeaway-title">The insight gap is the conversion gap</div>
+          <div class="impact-takeaway-desc">
+            Most brands know their conversion rate is low but can't pinpoint <em>why</em>. Simulation
+            closes that gap by generating a first-person narrative from every agent — making abstract
+            drop-off data into specific, actionable feedback. The simulator doesn't just tell you
+            <em>that</em> people leave; it tells you exactly what they were thinking when they did.
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-takeaway">
+        <div class="impact-takeaway-num">2</div>
+        <div class="impact-takeaway-body">
+          <div class="impact-takeaway-title">LLM tool-calling is the right abstraction for shopping</div>
+          <div class="impact-takeaway-desc">
+            Shopping is fundamentally a sequence of information-gathering decisions followed by a
+            commitment. That maps perfectly to agentic AI: gather context via tools, reason about
+            tradeoffs, decide. This isn't a prompt-engineering trick — it's multi-turn function calling
+            with real HTTP requests, live web searches, and genuine decision loops. The fidelity is
+            high because the mechanism matches the task.
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-takeaway">
+        <div class="impact-takeaway-num">3</div>
+        <div class="impact-takeaway-body">
+          <div class="impact-takeaway-title">Speed unlocks a new research cadence</div>
+          <div class="impact-takeaway-desc">
+            When a research cycle takes 6 weeks, teams run 2–3 studies per year. When it takes
+            10 minutes, teams can test before <em>every</em> deploy. This isn't an incremental
+            improvement — it's a paradigm shift in how product decisions get validated. The teams that
+            adopt this cadence first will compound their UX advantage faster than anyone using
+            traditional methods.
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-takeaway">
+        <div class="impact-takeaway-num">4</div>
+        <div class="impact-takeaway-body">
+          <div class="impact-takeaway-title">Pricing is the most underused lever in e-commerce</div>
+          <div class="impact-takeaway-desc">
+            Most stores pick a price and rarely revisit it. But the A/B simulation reveals that
+            different personas react to price changes differently — a 20% reduction might convert
+            budget shoppers but have no effect on luxury buyers. Real-time price sensitivity testing
+            across segmented personas is something no focus group or A/B split test can deliver
+            without months of traffic and statistical significance requirements.
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-takeaway">
+        <div class="impact-takeaway-num">5</div>
+        <div class="impact-takeaway-body">
+          <div class="impact-takeaway-title">The architecture is extensible by design</div>
+          <div class="impact-takeaway-desc">
+            Custom personas, vision analysis, multi-page navigation, and SSE streaming were all
+            added in layers without rewriting the core. The tool-calling pattern means new agent
+            capabilities are just new functions — and the simulation pipeline means new output types
+            (reports, visual analysis) are just new post-processing steps. This is a platform,
+            not a one-trick tool.
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-takeaway impact-takeaway--highlight">
+        <div class="impact-takeaway-num" style="color:#16a34a;background:rgba(22,163,74,0.12)">&#x2714;</div>
+        <div class="impact-takeaway-body">
+          <div class="impact-takeaway-title">Bottom line</div>
+          <div class="impact-takeaway-desc">
+            For ~$0.50 and 10 minutes, you get a conversion audit, per-persona drop-off analysis,
+            A/B price sensitivity, a GPT-4o UX consultant report, and optional visual analysis —
+            work that would cost a CX research firm $15,000–$50,000 and 4–6 weeks. The question
+            isn't whether AI simulation will replace traditional customer research. It's how quickly
+            every e-commerce team will make it part of their standard workflow.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA Banner -->
+  <div class="impact-cta">
+    <div class="impact-cta-inner">
+      <div class="impact-cta-title">Ready to see it in action?</div>
+      <div class="impact-cta-sub">
+        Paste any e-commerce URL and get your first AI customer simulation report in under 10 minutes.
+      </div>
+      <button class="impact-cta-btn" onclick="switchTab('simulator'); document.getElementById('url-input').focus()">
+        &#x1F680; Launch Simulator
+      </button>
+    </div>
+  </div>
+
+</div><!-- /tab-impact -->
+
+<script src="app.js"></script>
+</body>
+</html>
