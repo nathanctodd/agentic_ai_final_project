@@ -1,0 +1,166 @@
+======================================================================
+AGENTIC AI SHOPPER SIMULATOR — EVALUATION RESULTS
+Generated: 2026-04-24 16:18:28
+======================================================================
+
+SUMMARY TABLE
+----------------------------------------------------------------------
+URL                                 Mode         UX  Conv Steps  PVar  Spec
+----------------------------------------------------------------------
+nike.com/w/mens-running-shoes       full        100   78%   6.1 0.157  20.3
+nike.com/w/mens-running-shoes       baseline    100   33%   8.7 0.000  14.3
+allbirds.com/collections/mens-shoe  full         40    0%   4.7 0.000  14.9
+allbirds.com/collections/mens-shoe  baseline     40    0%   5.7 0.000  14.3
+kith.com/collections/footwear       full         60    0%   5.6 0.000  13.8
+kith.com/collections/footwear       baseline     60    0%   5.0 0.000  12.7
+----------------------------------------------------------------------
+Columns: UX=structural UX score (0-100), Conv=conversion rate,
+         Steps=avg tool calls, PVar=persona variance (std dev of
+         per-type conversion rates), Spec=avg exit reason word count
+
+
+======================================================================
+DETAILED RESULTS BY URL
+======================================================================
+
+URL:   https://www.nike.com/w/mens-running-shoes
+Mode:  full
+UX Score:        100/100
+Conversion rate: 78%  (7/9 agents purchased)
+Drop-off rate:   22%  (2/9 agents left)
+Avg steps:       6.11
+Persona variance:0.157  (0=no differentiation, 0.5=max)
+Avg reason len:  20.3 words
+Drop themes:     {'other': 2}
+Top complaints:  time, browsing, without, reaching, decision
+Per-persona breakdown:
+    budget      conv=100%  avg_steps=5.0  top_drop=none
+    luxury      conv=67%   avg_steps=7.3  top_drop=other
+    impulsive   conv=67%   avg_steps=6.0  top_drop=other
+GPT-4o UX score: 9/10
+Executive summary:
+  The e-commerce site demonstrates strong performance with a high conversion rate of 78% and a perfect UX score. However, there are opportunities to enhance decision-making efficiency and reduce drop-off rates.
+Critical issues:
+  - Luxury shoppers like luxury_3 left without purchasing due to 'running out of time', indicating potential issues with decision-making efficiency.
+  - Multiple agents, such as budget_1 and budget_2, had to rely heavily on product comparisons and reviews due to unclear initial product information.
+Quick wins:
+  - Improve visibility of product prices on initial view to reduce reliance on comparison tools.
+  - Enhance product descriptions to include key features upfront, reducing the need for extensive review searches.
+----------------------------------------------------------------------
+
+URL:   https://www.nike.com/w/mens-running-shoes
+Mode:  baseline
+UX Score:        100/100
+Conversion rate: 33%  (1/3 agents purchased)
+Drop-off rate:   67%  (2/3 agents left)
+Avg steps:       8.67
+Persona variance:0.0  (0=no differentiation, 0.5=max)
+Avg reason len:  14.3 words
+Drop themes:     {'other': 2}
+Top complaints:  time, browsing, without, reaching, decision
+GPT-4o UX score: 7/10
+Executive summary:
+  The e-commerce site demonstrates strong UX fundamentals with a perfect UX score, but conversion rates are hindered by decision fatigue and time constraints. While one agent successfully purchased, two others left due to time limitations despite extensive product exploration.
+Critical issues:
+  - Agents experienced decision fatigue as evidenced by the high number of tool calls (average 8.7) before making a decision.
+  - Two agents left the site citing 'ran out of time browsing without reaching a decision,' indicating a need for streamlined decision-making processes.
+Quick wins:
+  - Implement a 'compare products' feature more prominently to aid decision-making and reduce tool call volume.
+  - Enhance visibility of pricing information directly on product pages to reduce friction and uncertainty.
+----------------------------------------------------------------------
+
+URL:   https://www.allbirds.com/collections/mens-shoes
+Mode:  full
+UX Score:        40/100
+Conversion rate: 0%  (0/9 agents purchased)
+Drop-off rate:   100%  (9/9 agents left)
+Avg steps:       4.67
+Persona variance:0.0  (0=no differentiation, 0.5=max)
+Avg reason len:  14.9 words
+Drop themes:     {'price': 2, 'ux': 2, 'selection': 5}
+Top complaints:  products, find, site, purchase, can't
+Per-persona breakdown:
+    budget      conv=0%    avg_steps=4.7  top_drop=price
+    luxury      conv=0%    avg_steps=5.0  top_drop=selection
+    impulsive   conv=0%    avg_steps=4.3  top_drop=selection
+GPT-4o UX score: 2/10
+Executive summary:
+  The e-commerce site for men's shoes is underperforming, with a 0% conversion rate and a 100% drop-off rate. Users consistently encountered navigation issues, with no products or prices visible, leading to frustration and abandonment.
+Critical issues:
+  - Absence of visible products or prices, as evidenced by agents stating 'I couldn't find any products or prices on the site.'
+  - Frequent 'Uh-Oh, Nothing To See Here!' errors on key pages like Men's Running Shoes and Sale Section, leading to user confusion and drop-off.
+  - Ineffective navigation structure, with agents repeatedly navigating to pages without finding any purchasable items.
+Quick wins:
+  - Ensure all product pages display available products and their prices clearly.
+  - Fix the 'Uh-Oh, Nothing To See Here!' errors across all navigated pages to improve user experience.
+  - Improve the site's navigation to guide users to relevant products efficiently.
+----------------------------------------------------------------------
+
+URL:   https://www.allbirds.com/collections/mens-shoes
+Mode:  baseline
+UX Score:        40/100
+Conversion rate: 0%  (0/3 agents purchased)
+Drop-off rate:   100%  (3/3 agents left)
+Avg steps:       5.67
+Persona variance:0.0  (0=no differentiation, 0.5=max)
+Avg reason len:  14.3 words
+Drop themes:     {'ux': 1, 'price': 1, 'selection': 1}
+Top complaints:  products, site, find, purchase, couldn't
+GPT-4o UX score: 2/10
+Executive summary:
+  The e-commerce site for men's shoes is underperforming, with a 0% conversion rate and a 100% drop-off rate. Agents were unable to find any products or prices, leading to complete abandonment of the site.
+Critical issues:
+  - All agents encountered 'Uh-Oh, Nothing To See Here!' messages on every product page they visited, indicating a critical issue with product visibility.
+  - The return policy page was not found, which undermines trust and transparency for potential buyers.
+Quick wins:
+  - Ensure all product pages display products and prices correctly to prevent immediate drop-offs.
+  - Fix the broken return policy page to build trust with potential customers.
+----------------------------------------------------------------------
+
+URL:   https://kith.com/collections/footwear
+Mode:  full
+UX Score:        60/100
+Conversion rate: 0%  (0/9 agents purchased)
+Drop-off rate:   100%  (9/9 agents left)
+Avg steps:       5.56
+Persona variance:0.0  (0=no differentiation, 0.5=max)
+Avg reason len:  13.8 words
+Drop themes:     {'price': 4, 'other': 2, 'ux': 3}
+Top complaints:  find, products, can't, site, leaving
+Per-persona breakdown:
+    budget      conv=0%    avg_steps=6.3  top_drop=price
+    luxury      conv=0%    avg_steps=4.3  top_drop=other
+    impulsive   conv=0%    avg_steps=6.0  top_drop=ux
+GPT-4o UX score: 2/10
+Executive summary:
+  The e-commerce site for footwear is underperforming, with a 0% conversion rate and a 100% drop-off rate. Users are unable to find products or pricing information, leading to frustration and abandonment.
+Critical issues:
+  - Frequent 'Page not found' errors encountered by agents navigating to product pages, such as 'Men's Shoes' and 'Footwear'.
+  - Lack of visible product pricing, as highlighted by budget_1: 'I can't find any clearly priced products on this site.'
+  - Non-functional return policy page, returning a 404 error, as noted by luxury_2 and luxury_3.
+Quick wins:
+  - Fix broken links to ensure all product pages are accessible.
+  - Display clear pricing information on all product listings.
+  - Ensure the return policy page is functional and easily accessible.
+----------------------------------------------------------------------
+
+URL:   https://kith.com/collections/footwear
+Mode:  baseline
+UX Score:        60/100
+Conversion rate: 0%  (0/3 agents purchased)
+Drop-off rate:   100%  (3/3 agents left)
+Avg steps:       5.0
+Persona variance:0.0  (0=no differentiation, 0.5=max)
+Avg reason len:  12.7 words
+Drop themes:     {'ux': 2, 'price': 1}
+Top complaints:  find, products, purchase, browse, site
+GPT-4o UX score: 2/10
+Executive summary:
+  The e-commerce site for footwear is currently underperforming, with a 0% conversion rate and a 100% drop-off rate. Users are unable to find products due to broken links and unclear navigation, leading to frustration and abandonment.
+Critical issues:
+  - Multiple 'Page not found' errors were encountered, such as on the 'Shop Allcaret' and 'Men's Running Shoes' pages, preventing users from accessing product listings.
+  - Lack of product visibility and price clarity, as users reported they 'couldn't find any products to browse or purchase.'
+Quick wins:
+  - Fix broken links on key pages like 'Shop Allcaret' and 'Men's Running Shoes' to ensure users can access product listings.
+  - Ensure all product pages have clear and visible product listings and prices to improve user engagement.
+----------------------------------------------------------------------
