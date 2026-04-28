@@ -112,7 +112,7 @@ Evaluation combined a quantitative ablation study — comparing the full persona
 
 ### 3.1 Ablation Study: Full System vs. Baseline
 
-To measure the contribution of the persona system, the simulator was run in two modes against three publicly accessible storefronts spanning the quality spectrum:
+To measure the contribution of the persona system, the simulator was run in two modes against three publicly accessible storefronts:
 
 - **Full system** — 9 agents across 3 archetypes (budget, luxury, impulsive) with distinct budgets, impulsiveness scores, and goals
 - **Baseline** — 3 identical generic agents with no persona framing: *"browse the site and decide whether to buy something"*
@@ -130,24 +130,28 @@ Results (generated 2026-04-24):
 |---|---|---|---|---|---|---|
 | Nike.com | 100/100 | **Full** | **78%** | 6.1 | **0.157** | **20.3 words** |
 | Nike.com | 100/100 | Baseline | 33% | 8.7 | 0.000 | 14.3 words |
-| Allbirds.com | 40/100 | **Full** | 0% | 4.7 | 0.000 | 14.9 words |
-| Allbirds.com | 40/100 | Baseline | 0% | 5.7 | 0.000 | 14.3 words |
-| Kith.com | 60/100 | **Full** | 0% | 5.6 | 0.000 | 13.8 words |
-| Kith.com | 60/100 | Baseline | 0% | 5.0 | 0.000 | 12.7 words |
+| Allbirds.com | 40/100 | Full | 0%* | 4.7 | 0.000 | 14.9 words |
+| Allbirds.com | 40/100 | Baseline | 0%* | 5.7 | 0.000 | 14.3 words |
+| Kith.com | 60/100 | Full | 0%* | 5.6 | 0.000 | 13.8 words |
+| Kith.com | 60/100 | Baseline | 0%* | 5.0 | 0.000 | 12.7 words |
+
+*\* 0% conversion due to scraper incompatibility — see note below.*
+
+**Important note on Allbirds and Kith results:** Both sites are client-side rendered single-page applications (SPAs) built with React. The scraper uses Python `requests` + BeautifulSoup, which fetches only the initial HTML shell delivered by the server — JavaScript is never executed, so product listings and prices are never populated into the DOM. Agents on these sites correctly reported "I can't find any products or prices" because the scraper genuinely returned no product data, not because the sites have poor UX. The 0% conversion and low structural UX scores for these sites reflect a scraping compatibility failure, not a real evaluation of those storefronts. Nike.com works because it embeds product data server-side in a `__NEXT_DATA__` JSON block that is present in the raw HTML before JavaScript runs.
 
 ### 3.2 Key Findings
 
-**Personas meaningfully improve conversion signal on functional sites.** On Nike.com — the only site where products and prices were successfully scraped — the full system converted 78% of agents vs. 33% for the baseline (a 45-point gap). This gap reflects the persona system doing real work: budget agents used `compare_products` and `search_reviews` to validate value before committing, while the generic baseline agents had no goal to guide their decisions, exhausted their turn budget, and were forced to leave without buying.
+The meaningful quantitative comparison is the full system vs. baseline on Nike.com — the one site where scraping succeeded and agents had real product data to reason about.
 
-**Persona variance confirms behavioral differentiation.** On Nike, the full system produced a persona variance of 0.157 (budget: 100%, luxury: 67%, impulsive: 67%) vs. exactly 0.0 for the baseline. The three archetypes genuinely behaved differently from each other. Notably, budget agents outperformed luxury and impulsive agents on Nike — likely because their price-checking behavior (compare, review-search) gave them more evidence to act on, while luxury agents hit the 8-turn cap without finding a product that sufficiently signaled prestige.
+**Personas meaningfully improve conversion signal.** The full system converted 78% of agents vs. 33% for the baseline — a 45-point gap. Budget agents used `compare_products` and `search_reviews` to validate value before committing; the generic baseline agents had no goal to guide their decisions, exhausted their turn budget, and left without buying.
 
-**Reasoning specificity is higher with personas.** Exit and purchase reasons averaged 20.3 words in the full system vs. 14.3 words in the baseline on Nike — 42% longer. Generic agents produced boilerplate exits ("ran out of time browsing without reaching a decision") while persona-driven agents gave specific, grounded reasons tied to their goals.
+**Persona variance confirms behavioral differentiation.** The full system produced a persona variance of 0.157 (budget: 100%, luxury: 67%, impulsive: 67%) vs. exactly 0.0 for the baseline. The three archetypes genuinely behaved differently from each other. Budget agents outperformed luxury and impulsive agents — their price-checking behavior (compare, then review-search) gave them enough evidence to commit, while luxury agents hit the 8-turn cap without finding a product that sufficiently signaled prestige.
 
-**UX score strongly predicts simulated outcomes.** All three sites with lower UX scores (Allbirds: 40, Kith: 60) produced 0% conversion in both modes. The GPT-4o consultant confirmed this independently — Nike received a 9/10 report score while both Allbirds and Kith received 2/10. Drop-off theme analysis on the failing sites surfaced actionable signal even at 0% conversion: Allbirds agents primarily cited `selection` problems (5 of 9 drop-offs) while Kith agents split between `price` (4) and `ux` (3) — different root causes despite the same outcome.
+**Reasoning specificity is higher with personas.** Exit and purchase reasons averaged 20.3 words in the full system vs. 14.3 words in the baseline — 42% longer. Generic agents produced boilerplate exits ("ran out of time browsing without reaching a decision") while persona-driven agents gave specific, grounded reasons tied to their goals.
 
-**Persona types surface different UX pain points.** On Kith, budget agents' top drop theme was `price`, luxury agents cited `other` (navigation confusion), and impulsive agents cited `ux` friction. A single generic agent cannot produce this kind of segmented diagnosis.
+**Baseline agents were less efficient despite lower conversion.** Baseline agents averaged 8.7 steps vs. 6.1 for the full system — they wandered longer without a goal and still converted far less. Persona constraints help agents make decisions, not just color their reasoning.
 
-**Baseline agents were less efficient.** On Nike, baseline agents averaged 8.7 steps vs. 6.1 for the full system — they wandered longer without a goal and still converted far less often. This suggests persona constraints actually help agents make decisions, not just color their reasoning.
+**The scraping gap is itself a finding.** The fact that two of three tested sites returned no usable product data is a significant result: the system's current scraping approach is incompatible with modern JavaScript-heavy storefronts. This is discussed further in Section 3.4 and Conclusions.
 
 ### 3.3 Qualitative User Study
 
@@ -172,11 +176,12 @@ The lowest plausibility rating (3/5 from Evaluator C) reflects a case where an a
 
 ### 3.4 Limitations
 
-- Agents cannot actually add items to cart or navigate JavaScript-rendered checkout flows; `purchase` is a symbolic terminal action. Sites that require login-gated checkout or heavy JavaScript rendering (like Allbirds and Kith) will show 0% conversion even if the underlying products are appealing.
-- The structural UX score is a simple heuristic (5 boolean checks × 20 points). Sites can score 100 and still be poorly designed.
-- Persona variance collapses to 0.0 on sites where all agents leave for the same reason (broken pages), masking the signal that personas would otherwise produce on a functional site.
-- Agents share the same underlying LLM and may exhibit correlated biases not present in real populations.
-- DuckDuckGo review search results vary between runs, making exact reproduction of results impossible.
+- **JavaScript-rendered sites are not supported.** The scraper uses `requests` + BeautifulSoup and cannot execute JavaScript. Modern SPAs built with React, Vue, or similar frameworks (including Allbirds and Kith) deliver an empty HTML shell on first load; all product data is injected later by client-side JavaScript. The scraper returns no products for these sites, making simulation impossible. The system works reliably only on server-side rendered pages or sites that embed structured data (JSON-LD, `__NEXT_DATA__`) directly in the initial HTML response. Replacing `requests` with Playwright for the initial scrape would resolve this.
+- Agents cannot actually add items to cart or complete a real checkout; `purchase` is a symbolic terminal action.
+- The structural UX score is a simple heuristic (5 boolean checks × 20 points) and measures the HTML structure only, not design quality or copy.
+- Persona variance collapses to 0.0 when scraping fails and all agents leave for the same reason, masking behavioral signal entirely.
+- Agents share the same underlying LLM and may exhibit correlated biases not present in real shopper populations.
+- DuckDuckGo review search results vary between runs, making exact reproduction impossible.
 - Running all nine agents on a single URL costs approximately $0.10–$0.20 in OpenAI API credits.
 
 ---
@@ -195,7 +200,9 @@ Several things became clear through building and testing this system:
 
 **LLM-as-evaluator has natural limits.** The personas are not real users; they have no persistent memory, no real payment constraints, and no lived experience with a brand. They cannot feel visual hierarchy or notice a confusing checkout flow the way a human tester can. This system is best framed as a rapid first-pass audit — a way to surface obvious problems and generate hypotheses before more rigorous user testing.
 
-The project demonstrated that a small fleet of autonomous, tool-calling agents can produce genuine signal about e-commerce UX at a fraction of the cost and time of traditional user research methods.
+**The scraping layer is the system's critical bottleneck.** Two of three sites tested in the ablation returned zero usable data because they are JavaScript-rendered SPAs. The agent and analytics layers functioned correctly — the failure was entirely upstream in the scraper. This is arguably the most practically important finding: the system's reach is bounded by what the scraper can read, and most modern e-commerce storefronts require JavaScript execution to expose their product data. Swapping `requests` for a headless browser scrape (Playwright already ships with the project for the vision feature) would dramatically expand compatibility.
+
+The project demonstrated that a small fleet of autonomous, tool-calling agents can produce genuine signal about e-commerce UX at a fraction of the cost and time of traditional user research methods — provided the target site's product data is accessible to a static HTTP scraper.
 
 ---
 
